@@ -141,6 +141,8 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
   // `observations` are the same for all particles since these are the actual sensor measurements
   // create a vector called `predicted` to store all landmarks which are within sensor range for each particle
   // use dataAssociation to perform a nearest-neighbors search
+  
+  // Find landmark associations for each particle 
   for(int i=0; i<num_particles; ++i){
     float x_max, x_min;
     float y_max, y_min;
@@ -185,7 +187,18 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
     }
     // Update particle landmark associations
     SetAssociations(particles[i], associations, sense_x, sense_y);
-    
+  }
+
+  // Update particle weights
+  for(int i=0; i<num_particles; ++i){
+    for(int j=0; j<particles[i].associations.size(); ++j){
+      int id = particles[i].associations[j]+1; // Map landmark id is the index + 1
+      double landmark_x, landmark_y;
+      landmark_x = map_landmarks.landmark_list[id].x_f;
+      landmark_y = map_landmarks.landmark_list[id].y_f;
+      particles[i].weight *= multiv_prob(std_landmark[0], std_landmark[1], particles[i].sense_x[j], particles[i].sense_y[j],
+                                        landmark_x, landmark_y);
+    }
   }
 
 }
