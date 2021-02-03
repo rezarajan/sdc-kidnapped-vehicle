@@ -17,6 +17,7 @@
 #include <vector>
 
 #include "helper_functions.h"
+#include "multiv_gauss.h"
 
 using std::string;
 using std::vector;
@@ -88,9 +89,6 @@ void ParticleFilter::prediction(double delta_t, double std_pos[],
     particles[i].y = dist_y(gen);
     particles[i].theta = dist_theta(gen);
   }
-
-
-
 }
 
 void ParticleFilter::dataAssociation(vector<LandmarkObs> predicted, 
@@ -103,6 +101,23 @@ void ParticleFilter::dataAssociation(vector<LandmarkObs> predicted,
    *   probably find it useful to implement this method and use it as a helper 
    *   during the updateWeights phase.
    */
+  // Given all landmarks within the sensor range of a particle, find the nearest ones to
+  // the sensor measurements (using nearest-neighbors)
+  // NOTE: these observation associations are stored in the Particle `particle[i].association` vector
+  // use setAssociations method for this
+  // NOTE: observations do not contain an ID, since these are only measurements to unknown landmarks
+
+  for(int i=0; i<predicted.size(); ++i){
+    double min_dist = 0; 
+    for(int j=0; j<observations.size(); ++j){
+      double current_dist = dist(predicted[i].x, predicted[i].y, observations[j].x, observations[j].y);
+      // Update associations based on nearest neighbour
+      if(current_dist <= min_dist){
+        min_dist = current_dist;
+        observations[j].id = predicted[i].id;
+      }
+    }
+  }
 
 }
 
@@ -122,6 +137,56 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
    *   and the following is a good resource for the actual equation to implement
    *   (look at equation 3.33) http://planning.cs.uiuc.edu/node99.html
    */
+
+  // `observations` are the same for all particles since these are the actual sensor measurements
+  // create a vector called `predicted` to store all landmarks which are within sensor range for each particle
+  // use dataAssociation to perform a nearest-neighbors search
+  for(int i=0; i<num_particles; ++i){
+    float x_max, x_min;
+    float y_max, y_min;
+
+    vector<LandmarkObs> predicted;
+    // Checking for landmarks within sensor range of each particle
+    x_max = particles[i].x + sensor_range;
+    y_max = particles[i].y + sensor_range;
+    x_min = particles[i].x - sensor_range;
+    y_min = particles[i].y - sensor_range;
+
+    for(int j=0; j<map_landmarks.landmark_list.size(); ++j){
+      if((x_min <= map_landmarks.landmark_list[j].x_f <= x_max) && 
+          (y_min <= map_landmarks.landmark_list[j].y_f <= y_max)){
+            LandmarkObs landmark;
+            landmark.id = map_landmarks.landmark_list[j].id_i;
+            landmark.x = map_landmarks.landmark_list[j].x_f;
+            landmark.y = map_landmarks.landmark_list[j].y_f;
+            predicted.push_back(landmark);
+          }
+    }
+    // Copy observations vector for mutability in the dataAssociation method
+    // for each partile
+    vector<LandmarkObs> particleObs = observations;
+    for(int j=0; j<particleObs.size(); ++j){
+      // transform observations to map coordinates
+      double x_map, y_map;
+      particleObs[j].x = particles[i].x + (cos(particles[i].theta) * particleObs[j].x) - (sin(particles[i].theta) * particleObs[j].y);
+      particleObs[j].y = particles[i].y + (sin(particles[i].theta) * particleObs[j].x) + (cos(particles[i].theta) * particleObs[j].y);
+
+    }
+    // Find observation associations
+    dataAssociation(predicted, particleObs);
+
+    vector<int> associations;
+    vector<double> sense_x;
+    vector<double> sense_y;
+    for(int j=0; j<particleObs.size(); ++j){
+      associations.push_back(particleObs[j].id);
+      sense_x.push_back(particleObs[j].x);
+      sense_y.push_back(particleObs[j].y);
+    }
+    // Update particle landmark associations
+    SetAssociations(particles[i], associations, sense_x, sense_y);
+    
+  }
 
 }
 
