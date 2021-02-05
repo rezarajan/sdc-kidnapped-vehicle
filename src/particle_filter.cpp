@@ -149,26 +149,22 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
    *   and the following is a good resource for the actual equation to implement
    *   (look at equation 3.33) http://planning.cs.uiuc.edu/node99.html
    */
-
-  // `observations` are the same for all particles since these are the actual sensor measurements
-  // create a vector called `predicted` to store all landmarks which are within sensor range for each particle
-  // use dataAssociation to perform a nearest-neighbors search
   
   // Find landmark associations for each particle 
   double sensor_range_2 = sensor_range*sensor_range;
   for(int i=0; i<num_particles; ++i){
      vector<LandmarkObs> predicted;
 
-    for(int j=0; j<map_landmarks.landmark_list.size(); ++j){
-      double landmark_dx = map_landmarks.landmark_list[j].x_f - particles[i].x;
-      double landmark_dy = map_landmarks.landmark_list[j].y_f - particles[i].y;
+    // Checking for landmarks within sensor range of each particle
+    for (auto const & m: map_landmarks.landmark_list){
+      double landmark_dx = m.x_f - particles[i].x;
+      double landmark_dy = m.y_f - particles[i].y;
       double landmark_range_2 = landmark_dx*landmark_dx + landmark_dy*landmark_dy;
-      // Checking for landmarks within sensor range of each particle
       if(landmark_range_2 <= sensor_range_2){
             LandmarkObs landmark;
-            landmark.id = map_landmarks.landmark_list[j].id_i;
-            landmark.x = map_landmarks.landmark_list[j].x_f;
-            landmark.y = map_landmarks.landmark_list[j].y_f;
+            landmark.id = m.id_i;
+            landmark.x = m.x_f;
+            landmark.y = m.y_f;
             predicted.push_back(landmark);
           }
     }
@@ -177,10 +173,11 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
     // for each partile
     double theta = particles[i].theta;
     vector<LandmarkObs> particleObs;
-    for(unsigned int j = 0; j < observations.size(); j++) {
-      double x = particles[i].x + cos(theta)*observations[j].x - sin(theta)*observations[j].y;
-      double y = particles[i].y + sin(theta)*observations[j].x + cos(theta)*observations[j].y;
-      particleObs.push_back(LandmarkObs{ observations[j].id, x, y });
+
+    for (auto const & o: observations){
+      double x = particles[i].x + cos(theta)*o.x - sin(theta)*o.y;
+      double y = particles[i].y + sin(theta)*o.x + cos(theta)*o.y;
+      particleObs.push_back(LandmarkObs{ o.id, x, y });
     }
  
     // Find observation associations
@@ -189,18 +186,20 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
     vector<int> associations;
     vector<double> sense_x;
     vector<double> sense_y;
-    for(int j=0; j<particleObs.size(); ++j){
-      associations.push_back(particleObs[j].id);
-      sense_x.push_back(particleObs[j].x);
-      sense_y.push_back(particleObs[j].y);
+    for (auto const & p: particleObs){
+      associations.push_back(p.id);
+      sense_x.push_back(p.x);
+      sense_y.push_back(p.y);
     }
-    
+     
     // Update particle landmark associations
     SetAssociations(particles[i], associations, sense_x, sense_y);
     // Update particle weights
     particles[i].weight = 1.0;
+
+    // Find the landmark corresponding to the associated id
     for(int j=0; j<particles[i].associations.size(); ++j){
-      int id = particles[i].associations[j]; // Map landmark id is the index + 1
+      int id = particles[i].associations[j];
       double landmark_x, landmark_y;
       bool found = false;
       unsigned int k  = 0;
@@ -213,8 +212,6 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
         }
         k++;
       }
-
-      // double weight = ( 1/(2*M_PI*std_landmark[0]*std_landmark[1])) * exp( -( dX*dX/(2*std_landmark[0]*std_landmark[1]) + (dY*dY/(2*std_landmark[0]*std_landmark[1])) ) );
       double weight = multiv_prob(std_landmark[0], std_landmark[1], particles[i].sense_x[j], particles[i].sense_y[j],
                                         landmark_x, landmark_y);
       if (weight == 0) {
