@@ -63,6 +63,7 @@ int main() {
         
         if (event == "telemetry") {
           // j[1] is the data JSON object
+          std::cout<<"Telemetry\n";
           if (!pf.initialized()) {
             // Sense noisy position data from the simulator
             double sense_x = std::stod(j[1]["sense_x"].get<string>());
@@ -129,6 +130,10 @@ int main() {
 
           std::cout << "highest w " << highest_weight << std::endl;
           std::cout << "average w " << weight_sum/num_particles << std::endl;
+          std::cout << "Best Position: (" << best_particle.x << "," << best_particle.y << "," << best_particle.theta << ")" << std::endl;
+          for (int i=0; i<best_particle.sense_x.size(); ++i){
+            std::cout << "Best Observation: (" << best_particle.sense_x[i] << "," << best_particle.sense_y[i] << ")" << std::endl;
+          }
 
           json msgJson;
           msgJson["best_particle_x"] = best_particle.x;
